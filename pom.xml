@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- This is the parent project — all modules inherit from this -->
+    <groupId>com.logforge</groupId>
+    <artifactId>logforge-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>LogForge - Distributed Log Intelligence Platform</name>
+
+    <!-- List of all child modules -->
+    <modules>
+        <module>logforge-common</module>
+        <module>log-agent-sdk</module>
+        <module>ingestion-service</module>
+        <module>stream-processor</module>
+        <module>index-engine</module>
+        <module>storage-service</module>
+        <module>alert-engine</module>
+        <module>query-service</module>
+    </modules>
+
+    <!-- Inherit from Spring Boot's parent for managed versions -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Centralized dependency versions -->
+        <kafka.version>3.6.0</kafka.version>
+        <mongodb.version>4.11.1</mongodb.version>
+        <lombok.version>1.18.30</lombok.version>
+        <resilience4j.version>2.1.0</resilience4j.version>
+    </properties>
+
+    <!-- Dependencies available to ALL modules automatically -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- Dependency versions managed here — modules just declare groupId:artifactId -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- Our own shared module -->
+            <dependency>
+                <groupId>com.logforge</groupId>
+                <artifactId>logforge-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Kafka — version explicit since not in Spring Boot BOM -->
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+
+            <!-- Resilience4j — version explicit -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+
+            <!-- ZooKeeper client — version explicit -->
+            <dependency>
+                <groupId>org.apache.curator</groupId>
+                <artifactId>curator-recipes</artifactId>
+                <version>5.6.0</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+</project>

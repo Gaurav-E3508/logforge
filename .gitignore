@@ -1,0 +1,27 @@
+# Maven build output — never commit compiled code
+target/
+*.class
+*.jar
+*.war
+
+# IntelliJ IDEA files — IDE config is personal, not project
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Spring Boot config with secrets — never commit passwords
+**/application-prod.properties
+**/application-secret.properties
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker volumes
+mongodb_data/
+
+# Logs
+*.log
+logs/

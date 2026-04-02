@@ -32,9 +32,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HttpLoggingFilter implements Filter {
 
-    private final LogCaptureService logCaptureService;
     private final LogAgentProperties properties;
-
+    private final LogCaptureService logCaptureService;
     @Override
     public void doFilter(ServletRequest request,
                          ServletResponse response,
@@ -92,6 +91,7 @@ public class HttpLoggingFilter implements Filter {
             }
         }
     }
+
 
     private LogEvent.LogLevel resolveLevel(int httpStatus) {
         if (httpStatus >= 500) return LogEvent.LogLevel.ERROR;

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LogForge — Live Tail</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0d1117; color: #c9d1d9;
+               font-family: 'Courier New', monospace; height: 100vh;
+               display: flex; flex-direction: column; }
+        header { background: #161b22; border-bottom: 1px solid #30363d;
+                 padding: 12px 20px; display: flex;
+                 align-items: center; gap: 16px; }
+        header h1 { font-size: 18px; color: #58a6ff; }
+        #status { font-size: 12px; padding: 4px 10px; border-radius: 20px;
+                  background: #21262d; color: #8b949e; }
+        #status.connected { background: #0f3d1f; color: #3fb950; }
+        .controls { background: #161b22; border-bottom: 1px solid #30363d;
+                    padding: 10px 20px; display: flex; gap: 10px; }
+        input, select, button {
+            background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+            border-radius: 6px; padding: 6px 12px; font-size: 13px; }
+        button { cursor: pointer; background: #1f6feb; border-color: #1f6feb;
+                 color: white; }
+        button:hover { background: #388bfd; }
+        #search-bar { display: flex; gap: 8px; background: #161b22;
+                      border-bottom: 1px solid #30363d; padding: 10px 20px; }
+        #search-bar input { flex: 1; }
+        #log-container { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .log-entry { padding: 4px 8px; border-radius: 4px; margin: 2px 0;
+                     font-size: 13px; border-left: 3px solid transparent;
+                     display: grid;
+                     grid-template-columns: 160px 60px 160px 1fr;
+                     gap: 12px; align-items: start; }
+        .log-entry:hover { background: #161b22; }
+        .log-entry.ERROR { border-left-color: #f85149; }
+        .log-entry.FATAL { border-left-color: #ff7b72; background: #2d1117; }
+        .log-entry.WARN  { border-left-color: #d29922; }
+        .log-entry.INFO  { border-left-color: #3fb950; }
+        .log-entry.DEBUG { border-left-color: #8b949e; }
+        .ts      { color: #8b949e; font-size: 11px; }
+        .level   { font-weight: bold; font-size: 11px; }
+        .level.ERROR { color: #f85149; }
+        .level.FATAL { color: #ff7b72; }
+        .level.WARN  { color: #d29922; }
+        .level.INFO  { color: #3fb950; }
+        .service { color: #58a6ff; }
+        .message { color: #c9d1d9; word-break: break-word; }
+        #stats { background: #161b22; border-top: 1px solid #30363d;
+                 padding: 8px 20px; font-size: 12px; color: #8b949e;
+                 display: flex; gap: 24px; }
+        .stat-val { color: #c9d1d9; font-weight: bold; }
+        #search-results { padding: 10px 20px; }
+        .result-entry { padding: 8px; margin: 4px 0; background: #161b22;
+                        border-radius: 6px; border: 1px solid #30363d; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>⚡ LogForge</h1>
+    <span id="status">Connecting...</span>
+    <label style="margin-left:auto; font-size:13px; color:#8b949e">
+        <input type="checkbox" id="pause-toggle"> Pause
+    </label>
+    <button onclick="clearLogs()">Clear</button>
+</header>
+
+<div class="controls">
+    <select id="topic-select">
+        <option value="/topic/logs">All Services</option>
+        <option value="/topic/logs/errors">Errors Only</option>
+    </select>
+    <select id="level-filter">
+        <option value="">All Levels</option>
+        <option value="ERROR">ERROR</option>
+        <option value="WARN">WARN</option>
+        <option value="INFO">INFO</option>
+        <option value="FATAL">FATAL</option>
+    </select>
+    <input type="text" id="service-filter"
+           placeholder="Filter by service..." style="width:200px">
+</div>
+
+<div id="search-bar">
+    <input type="text" id="search-input"
+           placeholder='Search: level:ERROR AND service:payment'
+           onkeydown="if(event.key==='Enter') doSearch()">
+    <button onclick="doSearch()">Search</button>
+    <button onclick="clearSearch()" style="background:#21262d;
+            border-color:#30363d; color:#8b949e">Clear</button>
+</div>
+
+<div id="search-results" style="display:none"></div>
+<div id="log-container"></div>
+
+<div id="stats">
+    <span>Live events: <span class="stat-val" id="count">0</span></span>
+    <span>Errors: <span class="stat-val" id="error-count"
+                        style="color:#f85149">0</span></span>
+    <span>Connected to: <span class="stat-val" id="connected-topic">—</span></span>
+</div>
+
+<script>
+    let stompClient = null;
+    let subscription = null;
+    let totalCount   = 0;
+    let errorCount   = 0;
+    let paused       = false;
+    const MAX_DISPLAY = 500;
+
+    function connect() {
+        const socket = new SockJS('http://localhost:8086/ws');
+        stompClient  = Stomp.over(socket);
+        stompClient.debug = null; // silence debug logs
+
+        stompClient.connect({}, () => {
+            document.getElementById('status').textContent = '● Connected';
+            document.getElementById('status').className   = 'connected';
+            subscribeTo(document.getElementById('topic-select').value);
+        }, () => {
+            document.getElementById('status').textContent = 'Disconnected — retrying...';
+            document.getElementById('status').className   = '';
+            setTimeout(connect, 3000);
+        });
+    }
+
+    function subscribeTo(topic) {
+        if (subscription) subscription.unsubscribe();
+        subscription = stompClient.subscribe(topic, msg => {
+            if (paused) return;
+            const event = JSON.parse(msg.body);
+            appendLog(event);
+        });
+        document.getElementById('connected-topic').textContent = topic;
+    }
+
+    function appendLog(event) {
+        const levelFilter   = document.getElementById('level-filter').value;
+        const serviceFilter = document.getElementById('service-filter').value.toLowerCase();
+
+        if (levelFilter   && event.level !== levelFilter)                   return;
+        if (serviceFilter && !event.serviceName?.toLowerCase()
+                                    .includes(serviceFilter))               return;
+
+        totalCount++;
+        if (event.level === 'ERROR' || event.level === 'FATAL') errorCount++;
+
+        document.getElementById('count').textContent       = totalCount;
+        document.getElementById('error-count').textContent = errorCount;
+
+        const container = document.getElementById('log-container');
+        const div       = document.createElement('div');
+        div.className   = `log-entry ${event.level || 'INFO'}`;
+        div.innerHTML   = `
+            <span class="ts">${new Date(event.timestamp).toISOString()
+                               .replace('T',' ').substring(0,23)}</span>
+            <span class="level ${event.level}">${event.level || '—'}</span>
+            <span class="service">${event.serviceName || '—'}</span>
+            <span class="message">${escHtml(event.message || '')}</span>
+        `;
+        container.prepend(div); // newest at top
+
+        // Trim old entries to prevent memory bloat
+        while (container.children.length > MAX_DISPLAY) {
+            container.removeChild(container.lastChild);
+        }
+    }
+
+    function doSearch() {
+        const q = document.getElementById('search-input').value.trim();
+        if (!q) return;
+
+        fetch(`http://localhost:8086/api/query?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                const panel = document.getElementById('search-results');
+                panel.style.display = 'block';
+                panel.innerHTML = `
+                    <div style="color:#8b949e; font-size:12px; margin-bottom:8px">
+                        Found <strong style="color:#c9d1d9">${data.hits}</strong>
+                        results for <code style="color:#58a6ff">${escHtml(q)}</code>
+                        in ${data.durationMs}ms
+                    </div>
+                    ${(data.results || []).slice(0, 50).map(e => `
+                        <div class="result-entry">
+                            <span style="color:#8b949e; font-size:11px">
+                                ${new Date(e.timestamp).toISOString()
+                                   .replace('T',' ').substring(0,19)}</span>
+                            <span class="level ${e.level}"
+                                  style="margin: 0 10px">${e.level}</span>
+                            <span style="color:#58a6ff">${e.serviceName}</span>
+                            <span style="margin-left:10px">${escHtml(e.message||'')}</span>
+                        </div>
+                    `).join('')}
+                `;
+            })
+            .catch(err => console.error('Search error:', err));
+    }
+
+    function clearSearch() {
+        document.getElementById('search-results').style.display = 'none';
+        document.getElementById('search-results').innerHTML = '';
+        document.getElementById('search-input').value = '';
+    }
+
+    function clearLogs() {
+        document.getElementById('log-container').innerHTML = '';
+        totalCount = errorCount = 0;
+        document.getElementById('count').textContent       = '0';
+        document.getElementById('error-count').textContent = '0';
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.getElementById('pause-toggle')
+            .addEventListener('change', e => paused = e.target.checked);
+
+    document.getElementById('topic-select')
+            .addEventListener('change', e => subscribeTo(e.target.value));
+
+    connect();
+</script>
+</body>
+</html>

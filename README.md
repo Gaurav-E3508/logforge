@@ -57,13 +57,13 @@ Query Service + WebSocket Live Tail
 | Module | Description | Status |
 |---|---|---|
 | `logforge-common` | Shared schemas and utilities | ✅ Done |
-| `log-agent-sdk` | Auto-capture SDK for Spring Boot apps | 🔄 In Progress |
-| `ingestion-service` | Kafka consumer + processing pipeline | 🔄 In Progress |
-| `stream-processor` | Sliding window aggregations | ⏳ Planned |
-| `index-engine` | Custom inverted index engine | ⏳ Planned |
-| `storage-service` | Hot/warm/cold tiering | ⏳ Planned |
-| `alert-engine` | Anomaly detection + notifications | ⏳ Planned |
-| `query-service` | REST API + WebSocket live tail | ⏳ Planned |
+| `log-agent-sdk` | Auto-capture SDK for Spring Boot apps |✅ Done |
+| `ingestion-service` | Kafka consumer + processing pipeline | ✅ Done |
+| `stream-processor` | Sliding window aggregations | ✅ Done |
+| `index-engine` | Custom inverted index engine | ✅ Done |
+| `storage-service` | Hot/warm/cold tiering | ✅ Done|
+| `alert-engine` | Anomaly detection + notifications | ✅ Done |
+| `query-service` | REST API + WebSocket live tail | ✅ Done |
 
 ## Running Locally
 
@@ -79,9 +79,3 @@ mvn clean install -DskipTests
 open http://localhost:8090
 ```
 
-## Build Status
-```
-✅ Project scaffold — all 8 modules wired in Maven multi-module structure
-✅ Docker Compose — Kafka, ZooKeeper, Redis, MongoDB running locally
-🔄 Step 2 — LogEvent schema + Kafka topology (in progress)
-```

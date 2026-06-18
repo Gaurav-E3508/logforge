@@ -1,5 +1,6 @@
 package com.logforge.alert.controller;
 
+import com.logforge.alert.config.ConfigPublisher;
 import com.logforge.alert.model.AlertRule;
 import com.logforge.alert.service.AlertManager;
 import com.logforge.alert.statemachine.AlertInstance;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertController {
 
+    private final ConfigPublisher configPublisher;
     private final AlertManager alertManager;
 
     @GetMapping("/rules")
@@ -36,6 +38,15 @@ public class AlertController {
     public ResponseEntity<String> addRule(@RequestBody AlertRule rule) {
         alertManager.addRule(rule);
         return ResponseEntity.ok("Rule added: " + rule.getName());
+    }
+
+
+    @PutMapping("/config")
+    public ResponseEntity<String> updateDistributedConfig(
+            @RequestBody List<AlertRule> rules) {
+        configPublisher.publishRules(rules);
+        return ResponseEntity.ok("Published " + rules.size()
+                + " rule(s) — hot-reloading across all running alert-engine instances");
     }
 
     @GetMapping("/active")
